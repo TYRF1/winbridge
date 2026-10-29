@@ -1,0 +1,15 @@
+[package]
+name = "winbridge-fixture"
+version = "0.1.0"
+description = "Synthetic Tauri 2 app used by WinBridge's Wine integration loop."
+authors = ["WinBridge contributors"]
+edition = "2021"
+rust-version = "1.90"
+
+[build-dependencies]
+tauri-build = { version = "=2.7.4", features = [] }
+
+[dependencies]
+serde_json = "1"
+tauri = { version = "=2.12.5", features = [] }
+tauri-plugin-deep-link = "=2.6.2"

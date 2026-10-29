@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a behavior or support expansion
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what blocks you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should WinBridge do? Keep it app-agnostic.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Existing tools, manual steps, or workarounds you tried.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - v0.1 parity / bug
+        - v0.2 (backends, desktops, fonts, GPU)
+        - Later / uncertain
+    validations:
+      required: true
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Hygiene
+      options:
+        - label: This request contains no vendor names, binaries, or proprietary details.
+          required: true
+        - label: This request is generic (not an app-specific hack).
+          required: true

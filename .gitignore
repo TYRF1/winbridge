@@ -1,0 +1,36 @@
+# NEVER commit these (NDA + hygiene)
+*.exe
+*.msi
+*.deb
+*.AppImage
+bottles/
+*.prefix/
+*.reg.bak
+*.log
+__pycache__/
+node_modules/
+.DS_Store
+# Python tooling
+.venv/
+dist/
+build/
+*.egg-info/
+# Rust / Tauri fixture build output (the installer itself is covered by *.exe)
+target/
+fixtures/synthetic-tauri-app/src-tauri/gen/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# Test screenshots may contain unreleased app UI — keep local only
+screenshots/
+
+# makepkg output and downloaded AUR sources
+packaging/aur/src/
+packaging/aur/pkg/
+*.pkg.tar.*
+*.tar.gz
+
+# Agent workspace (ledger, briefs, review packages)
+.superpowers/

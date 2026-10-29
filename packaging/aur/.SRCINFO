@@ -1,0 +1,20 @@
+pkgbase = winbridge
+	pkgdesc = Run Windows Tauri/WebView2 builds on Linux without the Bottles yak-shave.
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/TYRF1/winbridge
+	arch = any
+	license = MIT
+	makedepends = python-build
+	makedepends = python-hatchling
+	makedepends = python-installer
+	depends = python
+	depends = python-typer
+	depends = python-rich
+	depends = python-tomli-w
+	depends = python-pillow
+	options = !debug
+	source = winbridge-0.1.0.tar.gz::https://files.pythonhosted.org/packages/source/w/winbridge/winbridge-0.1.0.tar.gz
+	sha256sums = 0000000000000000000000000000000000000000000000000000000000000000
+
+pkgname = winbridge

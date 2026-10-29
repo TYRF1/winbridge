@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WinBridge Fixture</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="main.js" defer></script>
+  </head>
+  <body class="loading">
+    <main id="app" aria-busy="true">
+      <header class="masthead">
+        <p class="eyebrow">WinBridge integration fixture</p>
+        <h1>Synthetic Tauri 2 app</h1>
+        <p class="lede">
+          This window is built in-repo from a pinned Tauri release. It exists to
+          prove the Wine pipeline, not to represent any real product.
+        </p>
+      </header>
+
+      <section class="grid" aria-label="Fixture facts">
+        <article class="card accent">
+          <span class="label">URL scheme</span>
+          <code>winbridge-fixture://</code>
+          <p>Registered by the NSIS installer and detected from the registry.</p>
+        </article>
+        <article class="card">
+          <span class="label">First paint delay</span>
+          <strong id="delay-value">pending</strong>
+          <p>Controlled by WINBRIDGE_FIXTURE_DELAY_MS through a Rust command.</p>
+        </article>
+        <article class="card">
+          <span class="label">Runtime</span>
+          <strong>WebView2</strong>
+          <p>Version is installed by WinBridge before this app runs.</p>
+        </article>
+      </section>
+
+      <section class="strip" aria-label="Pipeline stages">
+        <span>setup</span>
+        <span>verify</span>
+        <span>update</span>
+        <span>unbridge</span>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Run one command inside the headless sandbox.
+#
+# Guarantees: only this git worktree is visible at /work; no host home, display,
+# Wayland, GPU, or audio; read-only root; capped CPU, memory, and pids. The main
+# checkout is refused so a task can never edit it by accident.
+#
+# Usage:
+#   scripts/sandbox <command> [args...]
+#   scripts/sandbox -- uv run pytest -q
+#
+# Overrides:
+#   WINBRIDGE_SANDBOX_IMAGE   default winbridge-sandbox:local
+#   WINBRIDGE_SANDBOX_CPUS    default 2
+#   WINBRIDGE_SANDBOX_MEMORY  default 4g
+set -euo pipefail
+
+die() {
+  printf '[sandbox] %s\n' "$*" >&2
+  exit 2
+}
+
+[ "$(id -u)" != 0 ] || die "refusing to run as root; use rootless Podman"
+
+root=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null) ||
+  die "not inside a git worktree: $PWD"
+root=$(cd "$root" && pwd -P)
+
+# The main checkout has one git dir. A worktree has a separate admin dir, so
+# the two paths differ. Equality means we are in the checkout we must not touch.
+git_dir=$(git -C "$root" rev-parse --absolute-git-dir)
+common_dir=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)
+if [ "$git_dir" = "$common_dir" ]; then
+  die "refusing to run in the main checkout ($root): create a git worktree and run there"
+fi
+
+image=${WINBRIDGE_SANDBOX_IMAGE:-winbridge-sandbox:local}
+cpus=${WINBRIDGE_SANDBOX_CPUS:-2}
+memory=${WINBRIDGE_SANDBOX_MEMORY:-4g}
+cache_volume=winbridge-sandbox-cache
+
+command -v podman >/dev/null 2>&1 || die "podman is not installed"
+podman image exists "$image" ||
+  die "image $image is missing; run: bash scripts/sandbox-build"
+
+# Drop a leading -- so `scripts/sandbox -- cmd` works.
+if [ "${1:-}" = "--" ]; then
+  shift
+fi
+[ "$#" -gt 0 ] || die "usage: scripts/sandbox <command> [args...]"
+
+# Forward the host git identity, so commits made in the sandbox are attributed
+# correctly without mounting any host config file.
+git_env=()
+for key in user.name user.email; do
+  value=$(git -C "$root" config --get "$key" || true)
+  [ -n "$value" ] || continue
+  case "$key" in
+    user.name)
+      git_env+=(--env "GIT_AUTHOR_NAME=$value" --env "GIT_COMMITTER_NAME=$value")
+      ;;
+    user.email)
+      git_env+=(--env "GIT_AUTHOR_EMAIL=$value" --env "GIT_COMMITTER_EMAIL=$value")
+      ;;
+  esac
+done
+
+tty_args=()
+if [ -t 0 ] && [ -t 1 ]; then
+  tty_args+=(--tty)
+fi
+
+printf '[sandbox] %s | /work=%s | cpus=%s memory=%s\n' \
+  "$image" "$root" "$cpus" "$memory" >&2
+
+exec podman run \
+  --rm \
+  --interactive \
+  "${tty_args[@]}" \
+  --userns=keep-id \
+  --read-only \
+  --tmpfs /tmp:rw,size=1g,mode=1777 \
+  --volume "$root:/work:rw" \
+  --volume "$cache_volume:/cache:rw" \
+  --workdir /work \
+  --hostname winbridge-sandbox \
+  --cap-drop=all \
+  --security-opt=no-new-privileges \
+  --pids-limit=512 \
+  --cpus "$cpus" \
+  --memory "$memory" \
+  --env HOME=/tmp/home \
+  --env UV_CACHE_DIR=/cache/uv \
+  --env DISPLAY= \
+  --env WAYLAND_DISPLAY= \
+  --env WAYLAND_SOCKET= \
+  --env PYTHONDONTWRITEBYTECODE=1 \
+  --env PYTHONUNBUFFERED=1 \
+  --env UV_LINK_MODE=copy \
+  "${git_env[@]}" \
+  "$image" \
+  sh -c 'mkdir -p "$HOME" "$UV_CACHE_DIR"; exec "$@"' sh "$@"

@@ -1,0 +1,121 @@
+name: Catalog liveness
+
+# The catalog ships checksum-pinned download URLs. Runners and the WebView2
+# payload move or disappear upstream, so probe every URL once a week and fail
+# loudly instead of leaving a dead pin in a release.
+
+"on":
+  schedule:
+    # Mondays, 05:17 UTC.
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/winbridge/data/catalog.toml"
+      - ".github/workflows/catalog-check.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalog-check
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: HEAD every catalog URL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Probe the catalog
+        run: |
+          python - <<'PY'
+          """Fail when any catalog download URL answers 4xx or 5xx."""
+
+          import sys
+          import time
+          import tomllib
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          CATALOG = Path("src/winbridge/data/catalog.toml")
+          ATTEMPTS = 3
+          TIMEOUT = 30
+          USER_AGENT = "winbridge-catalog-check (+https://github.com/TYRF1/winbridge)"
+
+
+          def catalog_urls(document):
+              """Every download URL in the catalog, with a readable label."""
+              entries = []
+              if "latest_webview2_url" in document:
+                  entries.append(("latest_webview2_url", document["latest_webview2_url"]))
+              webview2 = document.get("webview2") or {}
+              if "url" in webview2:
+                  entries.append(("webview2.url", webview2["url"]))
+              for index, runner in enumerate(document.get("runners") or []):
+                  label = f"runners[{runner.get('id', index)}].url"
+                  if "url" not in runner:
+                      sys.exit(f"{label} is missing; the catalog layout changed")
+                  entries.append((label, runner["url"]))
+              if not entries:
+                  sys.exit("no catalog URLs found; the catalog layout changed")
+              return entries
+
+
+          def fetch(url, method="HEAD", extra=None):
+              headers = {"User-Agent": USER_AGENT}
+              headers.update(extra or {})
+              request = urllib.request.Request(url, method=method, headers=headers)
+              with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+                  return response.status
+
+
+          def probe(url):
+              try:
+                  return fetch(url)
+              except urllib.error.HTTPError as error:
+                  # Some CDNs reject HEAD; ask for the first byte instead.
+                  if error.code not in (403, 405, 501):
+                      raise
+              return fetch(url, method="GET", extra={"Range": "bytes=0-0"})
+
+
+          def check(label, url):
+              failure = "unknown error"
+              for attempt in range(1, ATTEMPTS + 1):
+                  try:
+                      status = probe(url)
+                  except Exception as error:  # report every failure, not just HTTP
+                      failure = f"{type(error).__name__}: {error}"
+                  else:
+                      if status < 400:
+                          print(f"ok   {status} {label} {url}")
+                          return True
+                      failure = f"HTTP {status}"
+                  if attempt < ATTEMPTS:
+                      time.sleep(2 * attempt)
+              print(f"FAIL {failure} {label} {url}", file=sys.stderr)
+              return False
+
+
+          def main():
+              entries = catalog_urls(tomllib.loads(CATALOG.read_text()))
+              print(f"checking {len(entries)} catalog URLs")
+              failed = [label for label, url in entries if not check(label, url)]
+              if failed:
+                  print(f"{len(failed)} unreachable: {', '.join(failed)}", file=sys.stderr)
+                  return 1
+              print("all catalog URLs responded")
+              return 0
+
+
+          raise SystemExit(main())
+          PY

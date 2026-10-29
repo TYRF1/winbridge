@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Build the headless sandbox image.
+#
+# This is the only project command that runs on the host: Podman cannot build
+# the image it is going to run. Everything else goes through scripts/sandbox.
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+image=${WINBRIDGE_SANDBOX_IMAGE:-winbridge-sandbox:local}
+containerfile="$root/sandbox/Containerfile"
+
+die() {
+  printf '[sandbox-build] %s\n' "$*" >&2
+  exit 1
+}
+
+[ "$(id -u)" != 0 ] || die "refusing to build as root; use rootless Podman"
+command -v podman >/dev/null 2>&1 || die "podman is not installed"
+[ -f "$containerfile" ] || die "missing $containerfile"
+
+printf '[sandbox-build] image  %s\n' "$image"
+printf '[sandbox-build] file   %s\n' "$containerfile"
+printf '[sandbox-build] rootless podman %s\n' "$(podman --version)"
+
+exec podman build \
+  --tag "$image" \
+  --file "$containerfile" \
+  "$root/sandbox"

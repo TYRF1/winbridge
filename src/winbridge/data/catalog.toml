@@ -1,0 +1,35 @@
+# WinBridge's embedded runner catalog.
+#
+# Trust channel: this file ships inside the WinBridge package, so updating the
+# catalog means releasing WinBridge. Never mirror runner binaries; link the
+# upstream release and pin its SHA-256. Compute a hash with:
+#   curl -L <url> | sha256sum
+#
+# `soda@11.0-10` is the v0.1 default (Wine 11.0 based Bottles runner). Its
+# invisible-cursor behavior is a documented limitation; verify does not check
+# the cursor.
+#
+# WebView2: `[webview2]` pins one standalone installer for --webview2=pinned
+# and offline installs. `latest_webview2_url` is Microsoft's Evergreen
+# bootstrapper (always the latest build, so it cannot carry a digest).
+
+schema = 1
+latest_webview2_url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+
+[webview2]
+# Evergreen Runtime 156.0.4314.42, standalone x64 installer (2026-10-23).
+version = "156.0.4314.42"
+released = "2026-10-23"
+url = "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/d6c50665-06a3-4ebe-8bde-7e408a78f093/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+sha256 = "9b0142e22e8daa92855d746ae4d1e9eeef561ccaf67d1dd452165c4af3df3191"
+
+[[runners]]
+id = "soda"
+version = "11.0-10"
+kind = "soda"
+url = "https://github.com/bottlesdevs/wine/releases/download/soda-11.0-10/soda-11.0-10-x86_64.tar.xz"
+sha256 = "14633fabd180d308d2c1ebcb84a16f36d0484dded5809c64f8a7c93e654d7296"
+archive_root = "soda-11.0-10-x86_64"
+wine_relpath = "bin/wine"
+default = true
+notes = "Wine 11.0 based; cursor visibility is not checked (known limitation)."

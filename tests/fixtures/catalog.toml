@@ -1,0 +1,30 @@
+# Synthetic catalog for unit tests. The soda entry mirrors the shipped
+# catalog; the example entry is deliberately fake and must never be installed.
+
+schema = 1
+latest_webview2_url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+
+[webview2]
+version = "156.0.4314.42"
+released = "2026-10-23"
+url = "https://example.invalid/webview2/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+sha256 = "9b0142e22e8daa92855d746ae4d1e9eeef561ccaf67d1dd452165c4af3df3191"
+
+[[runners]]
+id = "soda"
+version = "11.0-10"
+kind = "soda"
+url = "https://github.com/bottlesdevs/wine/releases/download/soda-11.0-10/soda-11.0-10-x86_64.tar.xz"
+sha256 = "14633fabd180d308d2c1ebcb84a16f36d0484dded5809c64f8a7c93e654d7296"
+archive_root = "soda-11.0-10-x86_64"
+wine_relpath = "bin/wine"
+default = true
+notes = "Bottles soda runner; cursor visibility is not checked."
+
+[[runners]]
+id = "example"
+version = "1.0"
+kind = "wine"
+url = "https://example.invalid/example-1.0.tar.xz"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+wine_relpath = "bin/wine"

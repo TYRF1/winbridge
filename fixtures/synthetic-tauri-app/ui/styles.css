@@ -1,0 +1,134 @@
+/* The body stays pure white while `loading` is set: the fixture must not paint
+   any visible content before the configured first-paint delay elapses. */
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #ffffff;
+  color: #14213d;
+  font-family: "Segoe UI", "DejaVu Sans", system-ui, sans-serif;
+}
+
+body.loading #app {
+  visibility: hidden;
+}
+
+body.ready #app {
+  visibility: visible;
+}
+
+#app {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 42px 48px 36px;
+  background:
+    linear-gradient(120deg, rgba(37, 99, 235, 0.12), transparent 55%),
+    linear-gradient(300deg, rgba(249, 115, 22, 0.14), transparent 50%),
+    #f7f9fc;
+}
+
+.masthead {
+  border-left: 8px solid #2563eb;
+  padding-left: 22px;
+  max-width: 760px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: 38px;
+  line-height: 1.15;
+}
+
+.lede {
+  margin: 14px 0 0;
+  color: #41506b;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 34px;
+}
+
+.card {
+  border: 1px solid #d7deea;
+  border-radius: 14px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(20, 33, 61, 0.06);
+}
+
+.card.accent {
+  border-color: #2563eb;
+  background: #eef4ff;
+}
+
+.label {
+  display: block;
+  margin-bottom: 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.card code,
+.card strong {
+  display: block;
+  color: #14213d;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.card code {
+  font-family: "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  color: #1d4ed8;
+  word-break: break-word;
+}
+
+.card p {
+  margin: 12px 0 0;
+  color: #56637a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.strip {
+  display: flex;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.strip span {
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: #14213d;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  #app {
+    padding: 28px 24px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

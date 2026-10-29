@@ -1,0 +1,182 @@
+name: Integration
+
+# The fixture is built on Windows, then the Wine pipeline runs on Arch with a
+# headless X11 session. Hyprland + NVIDIA is deliberately not claimed here; the
+# manual release checklist covers it.
+"on":
+  workflow_dispatch:
+  workflow_call:
+  # Nightly runs are disabled while the repository is private; re-enable this
+  # Manual until the headless fixture's WebView2 window is fixed. The release
+  # workflow still calls this job, so a tag cannot publish without it.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture:
+    name: synthetic installer (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned Tauri CLI
+        run: npm install --global @tauri-apps/cli@2.12.4
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fixtures/synthetic-tauri-app/src-tauri -> target
+          key: tauri-2.12.5
+
+      - name: Build the NSIS installer
+        working-directory: fixtures/synthetic-tauri-app
+        run: tauri build --bundles nsis
+
+      - name: Give the installer its integration artifact name
+        shell: pwsh
+        working-directory: fixtures/synthetic-tauri-app
+        run: |
+          $installer = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" |
+            Select-Object -First 1
+          if ($null -eq $installer) {
+            throw "Tauri did not produce an NSIS installer"
+          }
+          if ($installer.Length -lt 1MB) {
+            throw "NSIS installer is unexpectedly small: $($installer.Length) bytes"
+          }
+          Copy-Item -LiteralPath $installer.FullName -Destination "winbridge-fixture-setup.exe"
+          Write-Output "installer: $($installer.Name) ($($installer.Length) bytes)"
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: winbridge-fixture-setup
+          path: fixtures/synthetic-tauri-app/winbridge-fixture-setup.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  wine:
+    name: wine pipeline (Arch, X11)
+    needs: fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    container:
+      image: archlinux:latest
+      options: --security-opt seccomp=unconfined --shm-size=1g
+    steps:
+      # actions/checkout needs git, and the Arch base image has none.
+      - name: Bootstrap checkout tools
+        run: pacman -Syu --noconfirm --needed ca-certificates git unzip zip zstd
+
+      - uses: actions/checkout@v4
+
+      - name: Download the NSIS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: winbridge-fixture-setup
+          path: fixture-artifact
+
+      - name: Install Wine, X11, and test tooling
+        run: |
+          set -euo pipefail
+          # WinBridge only promises 32-bit installer support with multilib on.
+          sed -i 's/^#\[multilib\]/[multilib]/' /etc/pacman.conf
+          if ! grep -q '^\[multilib\]' /etc/pacman.conf; then
+            printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
+          fi
+          sed -i '/^\[multilib\]/{n;s/^#Include/Include/}' /etc/pacman.conf
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed \
+            dbus desktop-file-utils fontconfig freetype2 imagemagick \
+            lib32-fontconfig lib32-freetype2 lib32-gcc-libs lib32-glibc \
+            lib32-libx11 lib32-libxcomposite lib32-libxcursor lib32-libxext \
+            lib32-libxfixes lib32-libxi lib32-libxinerama lib32-libxrandr \
+            lib32-libxrender lib32-libxxf86vm openbox python shadow \
+            ttf-dejavu uv util-linux wine wine-gecko wine-mono wmctrl \
+            xdotool xorg-server-xvfb xorg-xprop
+          dbus-uuidgen --ensure=/etc/machine-id
+          install -d /var/lib/dbus
+          dbus-uuidgen --ensure=/var/lib/dbus/machine-id
+          useradd --create-home --shell /bin/bash builder
+          install -d -o builder -g builder /tmp/winbridge-integration
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: Cache uv downloads and managed Python
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/builder/.cache/uv
+            /home/builder/.local/share/uv/python
+          key: uv-arch-${{ hashFiles('uv.lock') }}
+          restore-keys: uv-arch-
+
+      # The test keeps the runner store and pinned WebView2 payload under
+      # WINBRIDGE_INTEGRATION_HOME but clears profiles, prefixes, and launchers
+      # before every run. Restoring those caches avoids re-downloading them.
+      - name: Cache the pinned Wine runner and WebView2 payload
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/winbridge-integration/data/winbridge/runners
+            /tmp/winbridge-integration/data/winbridge/cache
+          key: wine-assets-${{ hashFiles('src/winbridge/data/catalog.toml') }}
+          restore-keys: wine-assets-
+
+      - name: Take ownership of restored caches
+        run: |
+          set -euo pipefail
+          mkdir -p /home/builder/.cache/uv /home/builder/.local/share/uv/python
+          chown -R builder:builder \
+            "$GITHUB_WORKSPACE" /tmp/winbridge-integration \
+            /home/builder/.cache /home/builder/.local/share
+
+      - name: Install Python dependencies
+        run: |
+          set -euo pipefail
+          runuser -u builder -- env \
+            HOME=/home/builder \
+            UV_CACHE_DIR=/home/builder/.cache/uv \
+            uv sync --dev
+
+      - name: Run the Wine integration loop
+        run: |
+          set -euo pipefail
+          installer="$PWD/fixture-artifact/winbridge-fixture-setup.exe"
+          test -f "$installer"
+          runuser -u builder -- env \
+            HOME=/home/builder \
+            UV_CACHE_DIR=/home/builder/.cache/uv \
+            WINBRIDGE_INTEGRATION=1 \
+            WINBRIDGE_FIXTURE_INSTALLER="$installer" \
+            WINBRIDGE_INTEGRATION_HOME=/tmp/winbridge-integration \
+            xvfb-run -a -s "-screen 0 1280x800x24" \
+            dbus-run-session -- bash -eu -o pipefail -c '
+              openbox >/tmp/openbox.log 2>&1 &
+              for _ in 1 2 3 4 5 6 7 8 9 10; do
+                if wmctrl -m; then break; fi
+                sleep 1
+              done
+              wmctrl -m
+              uv run pytest tests/integration -q
+            '
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wine-integration-diagnostics
+          path: |
+            /tmp/winbridge-integration/data/winbridge/logs
+            /tmp/winbridge-integration/data/winbridge/evidence
+            /tmp/winbridge-integration/data/winbridge/prefixes/*/drive_c/ProgramData/Microsoft/EdgeUpdate/Log
+            /tmp/winbridge-integration/data/winbridge/prefixes/*/drive_c/users/*/AppData/Local/Microsoft/EdgeUpdate/Log
+            /tmp/winbridge-integration/data/winbridge/bundles
+            /tmp/openbox.log
+          if-no-files-found: ignore
+          retention-days: 7

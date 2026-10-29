@@ -1,0 +1,50 @@
+# Headless development sandbox for WinBridge.
+#
+# Deliberately narrow: no Wine, no desktop, no browser. Unit tests, lint, types,
+# and packaging run here; Windows-app and GUI checks stay on the host (see
+# docs/SANDBOX.md).
+FROM docker.io/library/archlinux:latest
+
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_LINK_MODE=copy \
+    UV_CACHE_DIR=/cache/uv
+
+# Python 3.11+ ships with Arch. Keep the list minimal: one package per tool the
+# suite or the QA adapters may call. uv is packaged in extra.
+RUN pacman -Syu --noconfirm --needed \
+      bash \
+      ca-certificates \
+      coreutils \
+      curl \
+      desktop-file-utils \
+      diffutils \
+      findutils \
+      git \
+      imagemagick \
+      less \
+      procps-ng \
+      python \
+      rust \
+      shellcheck \
+      tar \
+      unzip \
+      uv \
+      wmctrl \
+      xdotool \
+      xorg-server-xvfb \
+      xorg-xprop \
+      xz \
+    && pacman -Scc --noconfirm
+
+# Match the usual rootless uid so prompts and tools resolve a real user. Podman
+# --userns=keep-id still pins the runtime uid to the caller.
+RUN useradd --create-home --uid 1000 --shell /bin/bash dev
+
+WORKDIR /work
+USER dev
+
+CMD ["bash"]

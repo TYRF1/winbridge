@@ -1,0 +1,122 @@
+name: Release
+
+# Publishing runs only for version tags. PyPI uses trusted publishing (OIDC):
+# no API token or password is stored in the repository. The PyPI project must
+# list this workflow as its trusted publisher:
+#
+#   owner: TYRF1  repo: winbridge  workflow: release.yml  environment: pypi
+#
+# Keep the environment name in sync with the PyPI configuration.
+
+"on":
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The same Windows-fixture + Arch/Wine pipeline that runs on PRs and tags.
+  # Declaring it as a reusable workflow makes publish depend on a real
+  # integration pass for this commit instead of a race with a separate run.
+  integration:
+    name: integration gate
+    uses: ./.github/workflows/integration.yml
+
+  verify:
+    name: unit suite and static checks
+    needs: integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Types
+        run: uv run mypy src
+
+      - name: Tag, pyproject, and package version agree
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pyproject_version="$(uv run python -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          package_version="$(uv run python -c 'import winbridge; print(winbridge.__version__)')"
+          if [ "$tag" != "$pyproject_version" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match pyproject version ${pyproject_version}" >&2
+            exit 1
+          fi
+          if [ "$tag" != "$package_version" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match src/winbridge/__init__.py ${package_version}" >&2
+            exit 1
+          fi
+          echo "releasing ${tag} (pyproject ${pyproject_version}, __init__ ${package_version})"
+
+      - name: Unit tests
+        run: uv run pytest -q
+
+  build:
+    name: build and check artifacts
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Build the wheel and sdist
+        run: uv build
+
+      - name: Check the package metadata
+        run: uv run --with twine twine check dist/*
+
+      - name: Print the sdist digest for packaging/aur
+        run: sha256sum dist/*.tar.gz
+
+      - name: Upload the artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/winbridge
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download the artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

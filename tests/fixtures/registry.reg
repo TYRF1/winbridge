@@ -1,0 +1,109 @@
+Windows Registry Editor Version 5.00
+
+; URL handlers that must be detected: the executable lives inside the
+; install root and the scheme root carries a URL Protocol value.
+[HKEY_CLASSES_ROOT\example-app]
+@="URL:Example Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\example-app\DefaultIcon]
+@="\"C:\\Program Files\\Example\\Example.exe\",0"
+
+[HKEY_CLASSES_ROOT\example-app\shell\open\command]
+@="\"C:\\Program Files\\Example\\Example.exe\" \"%1\""
+
+; The same handler in the per-user and 32-bit class views. Detection must
+; de-duplicate instead of returning the scheme three times.
+[HKEY_CURRENT_USER\Software\Classes\example-app]
+@="URL:Example Protocol"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\example-app\shell\open\command]
+@="\"C:\\Program Files\\Example\\Example.exe\" \"%1\""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Wow6432Node\example-app]
+@="URL:Example Protocol"
+"URL Protocol"=""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Wow6432Node\example-app\shell\open\command]
+@="\"C:\\Program Files\\Example\\Example.exe\" \"%1\""
+
+; Prefix collision: the root string is a prefix of this installer directory,
+; but this command is not inside C:\Program Files\Example.
+[HKEY_CLASSES_ROOT\example-old]
+@="URL:Example Old Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\example-old\shell\open\command]
+@="\"C:\\Program Files\\Example-old\\Example.exe\" \"%1\""
+
+; Prefix collision with no separator at all.
+[HKEY_CLASSES_ROOT\example-two]
+@="URL:Example Two Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\example-two\shell\open\command]
+@="\"C:\\Program Files\\ExampleTwo\\Example.exe\" \"%1\""
+
+; No URL Protocol value, so this is a file association, not a scheme.
+[HKEY_CLASSES_ROOT\example-file]
+@="Example File"
+
+[HKEY_CLASSES_ROOT\example-file\shell\open\command]
+@="\"C:\\Program Files\\Example\\Example.exe\" \"%1\""
+
+; A dotted name is not a valid URL scheme.
+[HKEY_CLASSES_ROOT\.example]
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\.example\shell\open\command]
+@="\"C:\\Program Files\\Example\\Example.exe\" \"%1\""
+
+; A handler that points outside the install tree.
+[HKEY_CLASSES_ROOT\example-outside]
+@="URL:Example Outside Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\example-outside\shell\open\command]
+@="\"C:\\Windows\\System32\\cmd.exe\" \"%1\""
+
+; The install root appears only in the arguments of a launcher, not in the
+; command target. That is not a handler for this install tree.
+[HKEY_CLASSES_ROOT\example-args]
+@="URL:Example Args Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\example-args\shell\open\command]
+@="\"C:\\Windows\\System32\\rundll32.exe\" \"C:\\Program Files\\Example\\hook.dll\",Example"
+
+; Lexical traversal out of the install root must not count as containment.
+[HKEY_CLASSES_ROOT\example-traversal]
+@="URL:Example Traversal Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\example-traversal\shell\open\command]
+@="\"C:\\Program Files\\Example\\..\\Outside\\Example.exe\" \"%1\""
+
+; Uninstall entries for the version/display-name readers. Both registry views
+; and the per-user hive are represented.
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Example]
+"DisplayName"="Example"
+"DisplayVersion"="1.2.3"
+"InstallLocation"="C:\\Program Files\\Example\\"
+"DisplayIcon"="\"C:\\Program Files\\Example\\Example.exe\",0"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\ExampleOld32]
+"DisplayName"="Example Old"
+"DisplayVersion"="0.9.0"
+"InstallLocation"="C:\\Program Files (x86)\\ExampleOld\\"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\ExampleUser]
+"DisplayName"="Example"
+"DisplayVersion"="3.0.0"
+"InstallLocation"="C:\\users\\me\\AppData\\Local\\Programs\\Example\\"
+
+; A quoted value name with escaped characters, to prove the parser does not
+; split on a quote or an equals sign inside the name.
+[HKEY_CURRENT_USER\Software\Example]
+"quoted \"name\""="C:\\Program Files\\Example\\Example.exe"
+"equals=name"="C:\\tmp\\x"

@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Headless sandbox self-test. Everything below runs through scripts/sandbox, so
+# a pass also proves the wrapper's isolation and its main-checkout refusal.
+#
+# Requirements: rootless Podman and a built image (bash scripts/sandbox-build).
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+sandbox="$root/scripts/sandbox"
+
+say() { printf '[sandbox-selftest] %s\n' "$*"; }
+fail() {
+  printf '[sandbox-selftest] FAIL: %s\n' "$*" >&2
+  exit 1
+}
+
+if [ "$(id -u)" = 0 ]; then
+  fail "run as the unprivileged user, not root"
+fi
+
+[ -x "$sandbox" ] || fail "missing $sandbox (run: bash scripts/sandbox-build)"
+
+# The host home must be unreachable from inside the container. Derive it here
+# instead of hardcoding a username, so the check follows the host user.
+host_home=$(getent passwd "$(id -u)" | cut -d: -f6)
+[ -n "$host_home" ] || fail "cannot resolve the host home directory"
+host_user=${host_home##*/}
+
+# A crashed check must not leave an untracked file in the worktree.
+cleanup() { rm -f "$root/.sandbox-write"; }
+trap cleanup EXIT
+
+say "container checks"
+"$sandbox" sh -eu -c "
+  test \"\$(pwd)\" = /work
+  test \"\$HOME\" = /tmp/home
+  test -d \"\$HOME\"
+  test -z \"\${DISPLAY:-}\"
+  test -z \"\${WAYLAND_DISPLAY:-}\"
+  test -z \"\${WAYLAND_SOCKET:-}\"
+  test ! -e \"$host_home\"
+  test ! -e \"/home/$host_user\"
+  test ! -S /tmp/.X11-unix/X0
+  test ! -e /dev/dri
+  test ! -e /dev/snd
+  python -c 'import sys; assert sys.version_info >= (3, 11)'
+  uv --version
+  for tool in git curl tar xz convert Xvfb xdotool wmctrl \
+      desktop-file-validate update-desktop-database; do
+    command -v \"\$tool\" >/dev/null
+  done
+  root_opts=\$(findmnt -no OPTIONS /)
+  case \",\$root_opts,\" in
+    *,ro,*) ;;
+    *)
+      echo \"/ is not mounted read-only: \${root_opts%%,*}\" >&2
+      exit 1
+      ;;
+  esac
+  if touch /home/dev/.sandbox-root-probe 2>/dev/null; then
+    rm -f /home/dev/.sandbox-root-probe
+    echo 'writable image layer under a read-only root' >&2
+    exit 1
+  fi
+  touch .sandbox-write && rm .sandbox-write
+"
+say "ok: cwd /work, HOME /tmp/home, no host home/display/GPU/audio,"
+say "ok: / mounted ro and image-layer writes refused, python >= 3.11,"
+say "ok: uv and QA tools present, worktree writable"
+
+say "main-checkout refusal"
+common_dir=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)
+main_root=$(dirname "$common_dir")
+if [ "$main_root" = "$root" ]; then
+  fail "self-test must run from a git worktree, not the main checkout"
+fi
+[ -d "$main_root" ] || fail "main checkout not found: $main_root"
+if output=$(cd "$main_root" && "$sandbox" true 2>&1); then
+  fail "sandbox accepted the main checkout: $main_root"
+fi
+printf '%s\n' "$output" | grep -q 'main checkout' ||
+  fail "refusal did not explain the main checkout: $output"
+say "ok: refused $main_root"
+
+say "PASS"

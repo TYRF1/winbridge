@@ -1,0 +1,83 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "winbridge"
+version = "0.1.0"
+description = "Run Windows Tauri/WebView2 desktop builds on Linux without the Bottles yak-shave."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "WinBridge contributors" }]
+keywords = ["wine", "tauri", "webview2", "linux", "desktop"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Environment :: X11 Applications",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Testing",
+  "Typing :: Typed",
+]
+dependencies = [
+  "typer>=0.12",
+  "rich>=13.0",
+  "tomli-w>=1.0",
+  "pillow>=10.0",
+]
+
+[project.scripts]
+winbridge = "winbridge.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/TYRF1/winbridge"
+Documentation = "https://github.com/TYRF1/winbridge/tree/main/docs"
+Repository = "https://github.com/TYRF1/winbridge"
+Issues = "https://github.com/TYRF1/winbridge/issues"
+Changelog = "https://github.com/TYRF1/winbridge/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+  "mypy>=1.10",
+]
+
+[tool.hatch.build]
+include = [
+  "src/winbridge/**/*.py",
+  "src/winbridge/py.typed",
+  "src/winbridge/data/*.toml",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/winbridge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: needs Wine or a desktop"]
+addopts = "-ra"
+
+[tool.ruff]
+src = ["src", "tests"]
+target-version = "py311"
+line-length = 100
+extend-exclude = [".superpowers"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["winbridge"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+strict = true
+warn_unused_ignores = true

@@ -1,0 +1,56 @@
+name: Bug report
+description: Something in WinBridge does not work as documented
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include vendor app names, installers, screenshots, proprietary
+        logs, tokens, or callback URLs. Redact paths and window titles.
+        Run `winbridge doctor <app> --bundle` before filing.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Actual behavior, exact error text, and the command you ran.
+      placeholder: |
+        Command:
+        Observed:
+        Expected:
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: WinBridge version
+      description: Output of `winbridge --version`.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Distro, desktop/compositor, session type, GPU driver.
+      placeholder: Arch / Omarchy, Hyprland, XWayland, NVIDIA 5xx.xx
+    validations:
+      required: true
+  - type: input
+    id: runner
+    attributes:
+      label: Runner and WebView2
+      description: Runner id@version and WebView2 version from `winbridge doctor`.
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor bundle
+      description: Attach the redacted `doctor --bundle` archive after reviewing it.
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Hygiene
+      options:
+        - label: I removed all vendor names, binaries, screenshots, and tokens.
+          required: true
+        - label: I checked the support matrix and this platform is verified or experimental.
+          required: true
